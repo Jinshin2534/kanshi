@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ただ監視してくれるアプリ</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    overflow: hidden;
+    height: 100dvh;
+    width: 100vw;
+    font-family: 'Helvetica Neue', 'Hiragino Sans', sans-serif;
+    color: #fff;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ===== screens ===== */
+  .screen { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+  .screen.active { display: flex; }
+
+  /* ===== home ===== */
+  #home {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .home-eyes {
+    display: flex;
+    gap: clamp(8px, 3vw, 30px);
+    margin-bottom: clamp(30px, 6vh, 60px);
+  }
+
+  .home-eye {
+    width: clamp(48px, 14vw, 100px);
+    height: clamp(48px, 14vw, 100px);
+    background: radial-gradient(ellipse at 40% 40%, #fff, #e8e8e8, #d0d0d0);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 40px rgba(100,120,180,0.12);
+  }
+  .home-iris {
+    width: 55%; height: 55%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 35%, #4a3728, #2a1a0e);
+    display: flex; align-items: center; justify-content: center;
+    animation: homeGaze 4s ease-in-out infinite;
+  }
+  @keyframes homeGaze {
+    0%, 100% { transform: translate(0, 0); }
+    30% { transform: translate(3px, -1px); }
+    70% { transform: translate(-2px, 1px); }
+  }
+  .home-pupil {
+    width: 50%; height: 50%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #1a1a1a, #000);
+    position: relative;
+  }
+  .home-pupil::after {
+    content: '';
+    position: absolute;
+    width: 30%; height: 30%;
+    background: radial-gradient(circle, rgba(255,255,255,0.9), rgba(255,255,255,0.2));
+    border-radius: 50%;
+    top: 15%; left: 18%;
+  }
+
+  .home-title {
+    font-size: clamp(18px, 4.5vw, 32px);
+    font-weight: 300;
+    color: rgba(180, 190, 220, 0.8);
+    letter-spacing: 0.15em;
+    margin-bottom: clamp(40px, 8vh, 80px);
+  }
+
+  .home-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(14px, 3vh, 24px);
+    width: min(80vw, 340px);
+  }
+
+  .home-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: clamp(18px, 3.5vh, 28px) 24px;
+    color: #fff;
+    font-size: clamp(15px, 3.5vw, 20px);
+    font-family: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .home-btn:active { background: rgba(255,255,255,0.1); }
+  .home-btn .icon {
+    font-size: clamp(22px, 5vw, 30px);
+    width: 40px;
+    text-align: center;
+    opacity: 0.7;
+  }
+  .home-btn .label { font-weight: 400; }
+  .home-btn .sub {
+    font-size: clamp(11px, 2.5vw, 13px);
+    color: rgba(255,255,255,0.35);
+    font-weight: 300;
+    margin-top: 4px;
+  }
+
+  /* ===== watch screen (shared eyes) ===== */
+  #watchScreen {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .eyes-container {
+    display: flex;
+    gap: clamp(20px, 6vw, 80px);
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    width: 100%;
+    padding: 0 5vw;
+  }
+
+  .eye-outer {
+    width: clamp(120px, 38vw, 380px);
+    height: clamp(120px, 38vw, 380px);
+    background: radial-gradient(ellipse at 40% 40%, #fff, #e8e8e8, #d0d0d0);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    box-shadow:
+      inset 0 0 30px rgba(0,0,0,0.15),
+      0 0 60px rgba(100,120,180,0.15),
+      0 0 120px rgba(100,120,180,0.05);
+  }
+  .eye-outer.blink { animation: blink 0.18s ease-in-out; }
+  @keyframes blink {
+    0% { transform: scaleY(1); }
+    45% { transform: scaleY(0.04); }
+    55% { transform: scaleY(0.04); }
+    100% { transform: scaleY(1); }
+  }
+
+  .iris {
+    width: 55%; height: 55%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 35%, #4a3728, #2a1a0e);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    transition: transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+  .iris::before {
+    content: '';
+    position: absolute;
+    width: 110%; height: 110%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 35%, #7c5a3a, #5a3a1e, #2a1a0e);
+    z-index: -1;
+    opacity: 0.7;
+  }
+
+  .pupil {
+    width: 50%; height: 50%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #1a1a1a, #000);
+    position: relative;
+    transition: width 0.4s ease, height 0.4s ease;
+  }
+  .pupil::after {
+    content: '';
+    position: absolute;
+    width: 30%; height: 30%;
+    background: radial-gradient(circle, rgba(255,255,255,0.95), rgba(255,255,255,0.3));
+    border-radius: 50%;
+    top: 15%; left: 18%;
+  }
+  .pupil.dilated { width: 62%; height: 62%; }
+
+  .bottom-display {
+    padding-bottom: clamp(20px, 4vh, 50px);
+    text-align: center;
+  }
+  .bottom-display .time-text {
+    color: rgba(180,190,220,0.6);
+    font-size: clamp(14px, 3vw, 28px);
+    font-weight: 300;
+    letter-spacing: 0.3em;
+    font-variant-numeric: tabular-nums;
+  }
+  .bottom-display .timer-text {
+    color: rgba(180,190,220,0.7);
+    font-size: clamp(20px, 5vw, 42px);
+    font-weight: 200;
+    letter-spacing: 0.2em;
+    font-variant-numeric: tabular-nums;
+  }
+  .timer-label {
+    color: rgba(180,190,220,0.3);
+    font-size: clamp(10px, 2vw, 14px);
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    margin-top: 6px;
+  }
+
+  .back-btn {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.4);
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.3s;
+    z-index: 10;
+  }
+  .back-btn.hidden { opacity: 0; pointer-events: none; }
+
+  /* ===== timer setup ===== */
+  #timerSetup {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .setup-title {
+    font-size: clamp(16px, 3.5vw, 24px);
+    font-weight: 300;
+    color: rgba(180,190,220,0.6);
+    letter-spacing: 0.1em;
+    margin-bottom: clamp(20px, 3vh, 36px);
+  }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: clamp(8px, 2vw, 12px);
+    margin-bottom: clamp(24px, 4vh, 44px);
+    width: min(90vw, 400px);
+  }
+  .preset {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.55);
+    padding: clamp(8px, 1.8vw, 12px) clamp(14px, 3.5vw, 22px);
+    border-radius: 20px;
+    font-size: clamp(13px, 3vw, 16px);
+    font-family: inherit;
+    font-weight: 400;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .preset:active, .preset.selected {
+    background: rgba(100,130,220,0.18);
+    border-color: rgba(100,130,220,0.4);
+    color: rgba(170,190,250,0.95);
+  }
+
+  .drum-picker {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: clamp(32px, 6vh, 56px);
+    position: relative;
+  }
+
+  .drum-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .drum-col .unit {
+    font-size: clamp(10px, 2vw, 13px);
+    color: rgba(255,255,255,0.25);
+    font-weight: 300;
+    letter-spacing: 0.1em;
+    margin-top: 8px;
+  }
+
+  .drum-wrap {
+    position: relative;
+    height: calc(var(--item-h) * 5);
+    width: clamp(70px, 20vw, 110px);
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom,
+      transparent 0%, rgba(0,0,0,0.3) 15%, black 35%, black 65%, rgba(0,0,0,0.3) 85%, transparent 100%);
+    mask-image: linear-gradient(to bottom,
+      transparent 0%, rgba(0,0,0,0.3) 15%, black 35%, black 65%, rgba(0,0,0,0.3) 85%, transparent 100%);
+  }
+
+  .drum-scroll {
+    height: 100%;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .drum-scroll::-webkit-scrollbar { display: none; }
+
+  .drum-scroll .pad {
+    height: calc(var(--item-h) * 2);
+    flex-shrink: 0;
+  }
+
+  .drum-item {
+    height: var(--item-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(28px, 7.5vw, 48px);
+    font-weight: 200;
+    color: rgba(255,255,255,0.35);
+    scroll-snap-align: center;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.15s, transform 0.15s;
+    cursor: pointer;
+  }
+  .drum-item.active {
+    color: rgba(255,255,255,0.92);
+    transform: scale(1.1);
+  }
+
+  .drum-highlight {
+    position: absolute;
+    top: 50%;
+    left: 0; right: 0;
+    height: var(--item-h);
+    transform: translateY(-50%);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.03);
+    pointer-events: none;
+    border-radius: 8px;
+  }
+
+  .drum-sep {
+    font-size: clamp(28px, 7vw, 48px);
+    font-weight: 200;
+    color: rgba(255,255,255,0.2);
+    padding: 0 clamp(2px, 1vw, 8px);
+    margin-bottom: 28px;
+  }
+
+  .start-btn {
+    background: rgba(100,130,220,0.15);
+    border: 1px solid rgba(100,130,220,0.3);
+    color: rgba(160,180,240,0.9);
+    padding: clamp(14px, 3vh, 22px) clamp(40px, 10vw, 80px);
+    border-radius: 14px;
+    font-size: clamp(16px, 3.5vw, 22px);
+    font-family: inherit;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .start-btn:active { background: rgba(100,130,220,0.3); }
+  .start-btn:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
+
+  .setup-back {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.4);
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+  }
+
+  /* ===== timer done overlay ===== */
+  .done-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,15,0.92);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(20px, 4vh, 40px);
+    animation: fadeIn 0.5s ease;
+  }
+  .done-overlay.active { display: flex; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .done-msg {
+    font-size: clamp(20px, 5vw, 36px);
+    font-weight: 300;
+    color: rgba(180,200,240,0.9);
+    letter-spacing: 0.15em;
+  }
+  .done-sub {
+    font-size: clamp(13px, 3vw, 18px);
+    font-weight: 300;
+    color: rgba(180,190,220,0.4);
+  }
+  .done-btn {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.6);
+    padding: 14px 40px;
+    border-radius: 12px;
+    font-size: clamp(14px, 3vw, 18px);
+    font-family: inherit;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+
+  @media (orientation: landscape) and (max-height: 500px) {
+    .eye-outer { width: clamp(100px, 30vh, 260px); height: clamp(100px, 30vh, 260px); }
+    .eyes-container { gap: clamp(15px, 5vw, 60px); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== home ===== -->
+<div class="screen active" id="home">
+  <div class="home-eyes">
+    <div class="home-eye"><div class="home-iris"><div class="home-pupil"></div></div></div>
+    <div class="home-eye"><div class="home-iris"><div class="home-pupil"></div></div></div>
+  </div>
+  <div class="home-title">ただ監視してくれるアプリ</div>
+  <div class="home-buttons">
+    <button class="home-btn" id="btnClock">
+      <span class="icon">&#128337;</span>
+      <div>
+        <div class="label">ずっと監視</div>
+        <div class="sub">時計を表示しながら見つめ続ける</div>
+      </div>
+    </button>
+    <button class="home-btn" id="btnTimer">
+      <span class="icon">&#9201;</span>
+      <div>
+        <div class="label">タイマー監視</div>
+        <div class="sub">設定した時間だけ見つめる</div>
+      </div>
+    </button>
+  </div>
+</div>
+
+<!-- ===== timer setup ===== -->
+<div class="screen" id="timerSetup">
+  <button class="setup-back" id="setupBack">&#8249;</button>
+  <div class="setup-title">監視時間を設定</div>
+  <div class="presets">
+    <button class="preset" data-min="5">5分</button>
+    <button class="preset" data-min="10">10分</button>
+    <button class="preset" data-min="15">15分</button>
+    <button class="preset selected" data-min="25">25分</button>
+    <button class="preset" data-min="30">30分</button>
+    <button class="preset" data-min="45">45分</button>
+    <button class="preset" data-min="60">60分</button>
+    <button class="preset" data-min="90">90分</button>
+  </div>
+  <div class="drum-picker" style="--item-h: clamp(40px, 9vw, 56px);">
+    <div class="drum-highlight"></div>
+    <div class="drum-col">
+      <div class="drum-wrap">
+        <div class="drum-scroll" id="drumH"></div>
+      </div>
+      <div class="unit">時間</div>
+    </div>
+    <div class="drum-sep">:</div>
+    <div class="drum-col">
+      <div class="drum-wrap">
+        <div class="drum-scroll" id="drumM"></div>
+      </div>
+      <div class="unit">分</div>
+    </div>
+    <div class="drum-sep">:</div>
+    <div class="drum-col">
+      <div class="drum-wrap">
+        <div class="drum-scroll" id="drumS"></div>
+      </div>
+      <div class="unit">秒</div>
+    </div>
+  </div>
+  <button class="start-btn" id="startBtn">監視開始</button>
+</div>
+
+<!-- ===== watch screen ===== -->
+<div class="screen" id="watchScreen">
+  <button class="back-btn hidden" id="watchBack">&#8249;</button>
+  <div class="eyes-container">
+    <div class="eye-outer" id="eyeL">
+      <div class="iris" id="irisL"><div class="pupil" id="pupilL"></div></div>
+    </div>
+    <div class="eye-outer" id="eyeR">
+      <div class="iris" id="irisR"><div class="pupil" id="pupilR"></div></div>
+    </div>
+  </div>
+  <div class="bottom-display">
+    <div class="time-text" id="clockText"></div>
+    <div class="timer-text" id="timerText" style="display:none"></div>
+    <div class="timer-label" id="timerLabel" style="display:none">のこり</div>
+  </div>
+</div>
+
+<!-- ===== done overlay ===== -->
+<div class="done-overlay" id="doneOverlay">
+  <div class="done-msg">おつかれさま</div>
+  <div class="done-sub">監視終了</div>
+  <button class="done-btn" id="doneBtn">ホームに戻る</button>
+</div>
+
+<script>
+  // ===== screen management =====
+  let currentMode = null; // 'clock' | 'timer'
+  let timerInterval = null;
+  let timerRemaining = 0;
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  // ===== home =====
+  document.getElementById('btnClock').addEventListener('click', () => {
+    currentMode = 'clock';
+    document.getElementById('clockText').style.display = '';
+    document.getElementById('timerText').style.display = 'none';
+    document.getElementById('timerLabel').style.display = 'none';
+    showScreen('watchScreen');
+    startEyes();
+  });
+
+  document.getElementById('btnTimer').addEventListener('click', () => {
+    showScreen('timerSetup');
+    initDrums();
+    updateStartBtn();
+  });
+
+  // ===== drum picker =====
+  let pickH = 0, pickM = 25, pickS = 0;
+
+  function buildDrum(container, count) {
+    const items = [];
+    let skipSnap = false;
+
+    const pad1 = document.createElement('div');
+    pad1.className = 'pad';
+    container.appendChild(pad1);
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('div');
+      el.className = 'drum-item';
+      el.textContent = String(i).padStart(2, '0');
+      el.dataset.val = i;
+      container.appendChild(el);
+      items.push(el);
+      el.addEventListener('click', () => scrollTo(i));
+    }
+    const pad2 = document.createElement('div');
+    pad2.className = 'pad';
+    container.appendChild(pad2);
+
+    function itemH() { return items[0].offsetHeight || 44; }
+
+    function getSelected() {
+      return Math.min(Math.round(container.scrollTop / itemH()), items.length - 1);
+    }
+
+    function highlight() {
+      const center = container.scrollTop / itemH();
+      items.forEach((it, i) => {
+        it.classList.toggle('active', Math.abs(i - center) < 0.6);
+      });
+    }
+
+    let snapTimer;
+    container.addEventListener('scroll', () => {
+      highlight();
+      if (skipSnap) return;
+      clearTimeout(snapTimer);
+      snapTimer = setTimeout(() => {
+        const val = getSelected();
+        container.scrollTop = val * itemH();
+        highlight();
+        syncFromDrums();
+      }, 150);
+    }, { passive: true });
+
+    function scrollTo(val) {
+      const clamped = Math.max(0, Math.min(val, items.length - 1));
+      skipSnap = true;
+      clearTimeout(snapTimer);
+      container.scrollTop = clamped * itemH();
+      highlight();
+      setTimeout(() => { skipSnap = false; }, 50);
+    }
+
+    return { getSelected, scrollTo, highlight };
+  }
+
+  const drumH = buildDrum(document.getElementById('drumH'), 24);
+  const drumM = buildDrum(document.getElementById('drumM'), 60);
+  const drumS = buildDrum(document.getElementById('drumS'), 60);
+
+  function initDrums() {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        drumH.scrollTo(pickH);
+        drumM.scrollTo(pickM);
+        drumS.scrollTo(pickS);
+        updatePresetHighlight();
+      });
+    });
+  }
+
+  function syncFromDrums() {
+    pickH = drumH.getSelected();
+    pickM = drumM.getSelected();
+    pickS = drumS.getSelected();
+    updatePresetHighlight();
+    updateStartBtn();
+  }
+
+  function updateStartBtn() {
+    document.getElementById('startBtn').disabled = (pickH === 0 && pickM === 0 && pickS === 0);
+  }
+
+  function updatePresetHighlight() {
+    const totalMin = pickH * 60 + pickM + (pickS > 0 ? -1 : 0);
+    document.querySelectorAll('.preset').forEach(p => {
+      const pm = parseInt(p.dataset.min);
+      p.classList.toggle('selected', pickS === 0 && (pickH * 60 + pickM) === pm);
+    });
+  }
+
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const min = parseInt(btn.dataset.min);
+      pickH = Math.floor(min / 60);
+      pickM = min % 60;
+      pickS = 0;
+      drumH.scrollTo(pickH);
+      drumM.scrollTo(pickM);
+      drumS.scrollTo(pickS);
+      updatePresetHighlight();
+      updateStartBtn();
+    });
+  });
+
+  document.getElementById('setupBack').addEventListener('click', () => showScreen('home'));
+
+  document.getElementById('startBtn').addEventListener('click', () => {
+    syncFromDrums();
+    const total = pickH * 3600 + pickM * 60 + pickS;
+    if (total <= 0) return;
+    currentMode = 'timer';
+    timerRemaining = total;
+    document.getElementById('clockText').style.display = 'none';
+    document.getElementById('timerText').style.display = '';
+    document.getElementById('timerLabel').style.display = '';
+    showScreen('watchScreen');
+    startEyes();
+    startTimer();
+  });
+
+  // ===== timer logic =====
+  function formatTimer(sec) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  function startTimer() {
+    clearInterval(timerInterval);
+    document.getElementById('timerText').textContent = formatTimer(timerRemaining);
+    timerInterval = setInterval(() => {
+      timerRemaining--;
+      document.getElementById('timerText').textContent = formatTimer(timerRemaining);
+      if (timerRemaining <= 0) {
+        clearInterval(timerInterval);
+        timerDone();
+      }
+    }, 1000);
+  }
+
+  function timerDone() {
+    stopEyes();
+    document.getElementById('doneOverlay').classList.add('active');
+    try { navigator.vibrate?.([200, 100, 200, 100, 200]); } catch(e) {}
+  }
+
+  document.getElementById('doneBtn').addEventListener('click', () => {
+    document.getElementById('doneOverlay').classList.remove('active');
+    showScreen('home');
+  });
+
+  // ===== back button =====
+  const watchBack = document.getElementById('watchBack');
+  let backHideTimer;
+  document.addEventListener('mousemove', () => {
+    if (!document.getElementById('watchScreen').classList.contains('active')) return;
+    watchBack.classList.remove('hidden');
+    clearTimeout(backHideTimer);
+    backHideTimer = setTimeout(() => watchBack.classList.add('hidden'), 3000);
+  });
+  document.addEventListener('touchstart', () => {
+    if (!document.getElementById('watchScreen').classList.contains('active')) return;
+    watchBack.classList.remove('hidden');
+    clearTimeout(backHideTimer);
+    backHideTimer = setTimeout(() => watchBack.classList.add('hidden'), 3000);
+  }, { passive: true });
+
+  watchBack.addEventListener('click', () => {
+    clearInterval(timerInterval);
+    stopEyes();
+    showScreen('home');
+  });
+
+  // ===== eyes logic =====
+  const irisL = document.getElementById('irisL');
+  const irisR = document.getElementById('irisR');
+  const eyeL = document.getElementById('eyeL');
+  const eyeR = document.getElementById('eyeR');
+  const pupilL = document.getElementById('pupilL');
+  const pupilR = document.getElementById('pupilR');
+
+  let gazeTimer = null, blinkTimer = null, dilateTimer = null, clockInterval = null;
+  let eyesRunning = false;
+
+  function gazeAt(nx, ny) {
+    const rL = eyeL.getBoundingClientRect();
+    const rR = eyeR.getBoundingClientRect();
+    irisL.style.transform = `translate(${nx * rL.width * 0.14}px, ${ny * rL.width * 0.14}px)`;
+    irisR.style.transform = `translate(${nx * rR.width * 0.14}px, ${ny * rR.width * 0.14}px)`;
+  }
+
+  const behaviors = [
+    () => ({ x: 0, y: 0 }),
+    () => ({ x: (Math.random()-0.5)*0.6, y: (Math.random()-0.5)*0.4 }),
+    () => ({ x: 0, y: 0.3 }),
+    () => ({ x: (Math.random()-0.5)*1.4, y: (Math.random()-0.5)*0.3 }),
+    () => ({ x: 0, y: -0.2 }),
+    () => ({ x: 0.05, y: 0.05 }),
+  ];
+  const weights = [35, 25, 10, 10, 5, 15];
+
+  function pickBehavior() {
+    const total = weights.reduce((a,b) => a+b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < weights.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return behaviors[i];
+    }
+    return behaviors[0];
+  }
+
+  function scheduleGaze() {
+    if (!eyesRunning) return;
+    const t = pickBehavior()();
+    gazeAt(t.x, t.y);
+    const hold = (t.x === 0 && t.y === 0) ? 3000 + Math.random() * 6000 : 800 + Math.random() * 2500;
+    gazeTimer = setTimeout(scheduleGaze, hold);
+  }
+
+  function doBlink() {
+    eyeL.classList.add('blink');
+    eyeR.classList.add('blink');
+    setTimeout(() => { eyeL.classList.remove('blink'); eyeR.classList.remove('blink'); }, 220);
+  }
+
+  function scheduleBlink() {
+    if (!eyesRunning) return;
+    blinkTimer = setTimeout(() => {
+      doBlink();
+      if (Math.random() < 0.25) setTimeout(doBlink, 300);
+      scheduleBlink();
+    }, 2000 + Math.random() * 5000);
+  }
+
+  function scheduleDilate() {
+    if (!eyesRunning) return;
+    dilateTimer = setTimeout(() => {
+      const d = Math.random() < 0.5;
+      pupilL.classList.toggle('dilated', d);
+      pupilR.classList.toggle('dilated', d);
+      setTimeout(() => { pupilL.classList.remove('dilated'); pupilR.classList.remove('dilated'); }, 2000 + Math.random() * 3000);
+      scheduleDilate();
+    }, 5000 + Math.random() * 15000);
+  }
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clockText').textContent =
+      `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  }
+
+  function startEyes() {
+    eyesRunning = true;
+    gazeAt(0, 0);
+    scheduleGaze();
+    scheduleBlink();
+    scheduleDilate();
+    if (currentMode === 'clock') {
+      updateClock();
+      clockInterval = setInterval(updateClock, 1000);
+    }
+    watchBack.classList.add('hidden');
+  }
+
+  function stopEyes() {
+    eyesRunning = false;
+    clearTimeout(gazeTimer);
+    clearTimeout(blinkTimer);
+    clearTimeout(dilateTimer);
+    clearInterval(clockInterval);
+  }
+</script>
+</body>
+</html>
